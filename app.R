@@ -1,13 +1,12 @@
 library(BiocManager)
 options(repos = BiocManager::repositories())
-
 library(shiny)
+library(shinyjs)
 library(Seurat)
 library(ggplot2)
 library(plotly)
 library(RColorBrewer)
 # library(ggpubr)
-
 
 ## Only run examples in interactive R sessions
 # if (interactive()) {
@@ -34,7 +33,7 @@ ui <- fluidPage(
                 multiple = FALSE),
       
       # Select genes to use as markers
-      selectizeInput("gene_ls", 'Select marker genes:',
+      selectizeInput("gene_ls", "Select marker genes:",
                      selected = NULL,
                      choices = NULL,
                      options = list(create = TRUE),
@@ -42,7 +41,7 @@ ui <- fluidPage(
       actionButton(inputId = "apply_markers", label = "Update markers"),
       
       # Enter value to group by
-      selectizeInput("groupby", 'Coloring feature:',
+      selectizeInput("groupby", "Coloring feature:",
                      selected = NULL,
                      choices = NULL,
                      options = list(create = TRUE),
@@ -51,7 +50,8 @@ ui <- fluidPage(
       actionButton(inputId = "apply_groupby", label = "Update coloring"),
       
       # Which labels to add to interactive output
-      selectizeInput("interactive_labels", 'Interactive labels:',
+      selectizeInput("interactive_labels",
+                     "Interactive labels:",
                      selected = NULL,
                      choices = NULL,
                      options = list(create = TRUE),
@@ -62,7 +62,8 @@ ui <- fluidPage(
                   min = 0,
                   max = 10,
                   value = 4,
-                  step = 0.1)
+                  step = 0.1),
+      
     ),
     
     ############################
@@ -90,6 +91,10 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   # Setting maximum file size to 4GB
   options(shiny.maxRequestSize=4000*1024^2)
+  
+  observeEvent(input$apply_checkbox, {
+    shinyjs::toggle("interactive_filter")
+  })
   
   ##########################################
   ##### Defining environment variables #####
@@ -169,15 +174,14 @@ server <- function(input, output, session) {
     input$interactive_labels
   })
   
+  
   ########################################
   ######### Plot visualization ###########
   ########################################
 
   # UMAP clusters
   output$dimPlot <- renderPlotly({
-    # tmp_dim <- DimPlot(se_obj, reduction = "tsne", label = F, pt.size = 0.5, group.by = groupby_var())
-    # dim_plot <- HoverLocator(plot = tmp_dim, information = FetchData(se_obj, vars = input$interactive_labels))
-    
+
     labs_dim <- lapply(input$interactive_labels, function(i){
       paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
     }) %>% purrr::pmap_chr(., paste)
@@ -353,33 +357,7 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
-# }
 
-
-# p <- plot_ly(
-#     # x = se_obj@meta.data[,groupby_var()],
-#     # y = se_obj@assays$SCT@data[,gene_list()[1]],
-#     # split = se_obj@meta.data[,groupby_var()],
-#     x = se_obj@meta.data[,"maturation_stage"],
-#     y = se_obj@assays$SCT@data['TRIM13',],
-#     split = se_obj@meta.data[,"maturation_stage"],
-#     type = 'violin',
-#     points = 'all',
-#     jitter = 5,
-#     pointpos = 0,
-#     box = list(
-#       visible = F
-#     ),
-#     meanline = list(
-#       visible = T
-#     )
-#   ) %>%
-#   layout(
-#     xaxis = list(
-#       title = groupby_var()
-#     ),
-#     yaxis = list(
-#       title = "Expression Level",
-#       zeroline = F
-#     )
-#   )
+# # Code profiling
+# library(profvis)
+# profvis(runApp())
