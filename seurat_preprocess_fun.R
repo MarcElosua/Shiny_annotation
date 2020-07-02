@@ -34,7 +34,7 @@ prepare_se_obj <- function(se_obj,
   colnames(embed_df) <- c("barcode", "coord_x", "coord_y")
   
   # Join metadata with coordinates
-  metadata_df <- ica_se@meta.data %>%
+  metadata_df <- se_obj@meta.data %>%
     data.frame() %>%
     tibble::rownames_to_column("barcode") %>%
     dplyr::left_join(embed_df, by = "barcode")
