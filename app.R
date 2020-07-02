@@ -62,7 +62,16 @@ ui <- fluidPage(
                   min = 0,
                   max = 10,
                   value = 4,
-                  step = 0.1)
+                  step = 0.1),
+      
+      # Which labels to add to interactive output
+      selectizeInput("filter_var", 'Interactive labels:',
+                     selected = NULL,
+                     choices = NULL,
+                     options = list(create = TRUE),
+                     multiple = TRUE),
+      
+      
     ),
     
     ############################
@@ -89,7 +98,7 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   # Setting maximum file size to 4GB
-  options(shiny.maxRequestSize=4000*1024^2)
+  options(shiny.maxRequestSize=8000*1024^2)
   
   ##########################################
   ##### Defining environment variables #####
