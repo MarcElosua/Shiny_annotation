@@ -1,4 +1,4 @@
-#' This function takes in deconvolution matrix and returns a network igraph object
+#' This function takes in a seurat object and returns a named list with 2 objects, 1st the metadata + the coordinates of the 2D embeding, the later with names coord_x and coord_y, and second the expression matrix selected.
 #'
 #' @param se_obj Object of class Seurat from which we want to extract the information.
 #' @param assay Object of class Character indicating from which assay to extract expression data.

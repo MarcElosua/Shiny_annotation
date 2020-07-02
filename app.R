@@ -88,8 +88,8 @@ ui <- fluidPage(
 ##################################################################################################################
 
 server <- function(input, output, session) {
-  # Setting maximum file size to 30Mb
-  options(shiny.maxRequestSize=2000*1024^2)
+  # Setting maximum file size to 4GB
+  options(shiny.maxRequestSize=4000*1024^2)
   
   ##########################################
   ##### Defining environment variables #####
