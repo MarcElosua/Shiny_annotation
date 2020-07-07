@@ -268,7 +268,7 @@ server <- function(input, output, session) {
   # Violin plots
   output$ViolinPlot <- renderPlotly({
     labs_ls <- lapply(input$interactive_labels, function(i){
-      paste(sprintf("%s: ", i), metadata_df[, i], sep = "")
+      paste(sprintf("\n%s: ", i), metadata_df[, i], sep = "")
     }) %>% purrr::pmap_chr(., paste)
     
     ## Plot all genes
