@@ -213,6 +213,11 @@ server <- function(input, output, session) {
     input$filter_grp
   })
   
+  dfInput <- reactive({
+    ##subsetting is a bit tricky here to id the column on which to subset        
+    metadata_df[metadata_df[, filter_var()] %in% apply_grp(), ]
+  })
+
   
   ########################################
   ######### Plot visualization ###########
@@ -220,18 +225,16 @@ server <- function(input, output, session) {
   
   # UMAP clusters
   output$dimPlot <- renderPlotly({
-    # tmp_dim <- DimPlot(se_obj, reduction = "tsne", label = F, pt.size = 0.5, group.by = groupby_var())
-    # dim_plot <- HoverLocator(plot = tmp_dim, information = FetchData(se_obj, vars = input$interactive_labels))
     
+    metadata_df <- dfInput()
+    # Set interactive labels
     labs_dim <- lapply(input$interactive_labels, function(i){
-      paste(sprintf('\n%s: ',i), metadata_df[, filter_var()] %in% apply_grp()[,i], sep = '')
+      paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
     }) %>% purrr::pmap_chr(., paste)
     
-    keep_id <- metadata_df[, filter_var()] %in% apply_grp()
-    
-    dim_plot <- plot_ly(x = metadata_df[keep_id, "coord_x"],
-                        y = metadata_df[keep_id, "coord_y"],
-                        color = metadata_df[keep_id, groupby_var()],
+    dim_plot <- plot_ly(x = metadata_df[, "coord_x"],
+                        y = metadata_df[, "coord_y"],
+                        color = metadata_df[, groupby_var()],
                         # Hover text:
                         text = labs_dim,
                         marker = list(size = as.numeric(input$size))
@@ -245,6 +248,9 @@ server <- function(input, output, session) {
   
   # Feature plot
   output$FeaturePlot <- renderPlotly({
+    
+    metadata_df <- dfInput()
+    
     # tmp_feat <- FeaturePlot(se_obj, features = gene_list())
     labs_feat <- lapply(input$interactive_labels, function(i){
       paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
@@ -311,6 +317,9 @@ server <- function(input, output, session) {
   
   # Violin plots
   output$ViolinPlot <- renderPlotly({
+    
+    metadata_df <- dfInput()
+    
     labs_ls <- lapply(input$interactive_labels, function(i){
       paste(sprintf("%s: ", i), metadata_df[, i], sep = "")
     }) %>% purrr::pmap_chr(., paste)
