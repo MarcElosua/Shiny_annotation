@@ -8,6 +8,8 @@ library(plotly)
 library(RColorBrewer)
 # library(ggpubr)
 
+# Metadata dataframe set as NULL at the beginning to avoid showing error
+if (! exists("metadata_df")) metadata_df <- NULL
 
 ## Only run examples in interactive R sessions
 # if (interactive()) {
@@ -34,7 +36,7 @@ ui <- fluidPage(
                 multiple = FALSE),
       
       # Select genes to use as markers
-      selectizeInput("gene_ls", 'Select marker genes:',
+      selectizeInput("gene_ls", "Select marker genes:",
                      selected = NULL,
                      choices = NULL,
                      options = list(create = TRUE),
@@ -51,7 +53,7 @@ ui <- fluidPage(
       actionButton(inputId = "apply_groupby", label = "Update coloring"),
       
       # Which labels to add to interactive output
-      selectizeInput("interactive_labels", 'Interactive labels:',
+      selectizeInput("interactive_labels", "Interactive labels:",
                      selected = NULL,
                      choices = NULL,
                      options = list(create = TRUE),
@@ -65,12 +67,20 @@ ui <- fluidPage(
                   step = 0.1),
       
       # Which labels to add to interactive output
-      selectizeInput("filter_var", 'Interactive labels:',
+      selectizeInput("filter_var", "Filtering group:",
                      selected = NULL,
                      choices = NULL,
                      options = list(create = TRUE),
-                     multiple = TRUE),
+                     multiple = FALSE),
       
+      actionButton(inputId = "apply_filter", label = "Update variable"),
+      
+      # Which groups to keep
+      checkboxGroupInput("filter_grp", "Groups to include:",
+                         choices = "",
+                         selected = NULL),
+      
+      actionButton(inputId = "apply_grp", label = "Update filter"),
       
     ),
     
@@ -161,7 +171,24 @@ server <- function(input, output, session) {
                                      colnames(metadata_df)),
                          selected = colnames(metadata_df)[1])
     
+    # Update Filtering variable selection
+    updateSelectizeInput(session,
+                         inputId = "filter_var",
+                         choices = c("", 
+                                     colnames(metadata_df)),
+                         selected = colnames(metadata_df)[1])
+    
   })
+  
+  # Independent observe event for checkbox input so it doesn't update all the rest
+  observe({
+    # Update Filtering groups
+    updateCheckboxGroupInput(session,
+                             inputId = "filter_grp",
+                             choices = unique(metadata_df[, filter_var()]),
+                             selected = unique(metadata_df[, filter_var()]))
+  })
+  
   
   ########################################
   ######## Setting reactive events #######
@@ -178,22 +205,33 @@ server <- function(input, output, session) {
     input$interactive_labels
   })
   
+  filter_var <- eventReactive(input$apply_filter, {
+    input$filter_var
+  })
+  
+  apply_grp <- eventReactive(input$apply_grp, {
+    input$filter_grp
+  })
+  
+  
   ########################################
   ######### Plot visualization ###########
   ########################################
-
+  
   # UMAP clusters
   output$dimPlot <- renderPlotly({
     # tmp_dim <- DimPlot(se_obj, reduction = "tsne", label = F, pt.size = 0.5, group.by = groupby_var())
     # dim_plot <- HoverLocator(plot = tmp_dim, information = FetchData(se_obj, vars = input$interactive_labels))
     
     labs_dim <- lapply(input$interactive_labels, function(i){
-      paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
+      paste(sprintf('\n%s: ',i), metadata_df[, filter_var()] %in% apply_grp()[,i], sep = '')
     }) %>% purrr::pmap_chr(., paste)
     
-    dim_plot <- plot_ly(x = metadata_df[,"coord_x"],
-                        y = metadata_df[,"coord_y"],
-                        color = metadata_df[, groupby_var()],
+    keep_id <- metadata_df[, filter_var()] %in% apply_grp()
+    
+    dim_plot <- plot_ly(x = metadata_df[keep_id, "coord_x"],
+                        y = metadata_df[keep_id, "coord_y"],
+                        color = metadata_df[keep_id, groupby_var()],
                         # Hover text:
                         text = labs_dim,
                         marker = list(size = as.numeric(input$size))
@@ -201,6 +239,7 @@ server <- function(input, output, session) {
     
     return(dim_plot)
   })
+
   
   # Feature plot and Violin plot are dependent on apply_markers button to be pressed
   
