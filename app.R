@@ -6,7 +6,7 @@ library(Seurat)
 library(ggplot2)
 library(plotly)
 library(RColorBrewer)
-# library(ggpubr)
+library(DT)
 
 # Metadata dataframe set as NULL at the beginning to avoid showing error
 if (! exists("metadata_df")) metadata_df <- NULL
@@ -92,7 +92,13 @@ ui <- fluidPage(
         tabPanel(title = 'UMAP Plot',
                  plotlyOutput("dimPlot", height = "800")),
         tabPanel(title = 'Feature Plots',
-                 plotlyOutput("FeaturePlot", height = "800")),
+                 fluidRow(
+                   splitLayout(cellWidths = c("50%", "50%"),
+                 plotlyOutput("FeaturePlot", height = "800"),
+                 DT::dataTableOutput("MarkerGenes")
+                      )
+                    )
+                 ),
         tabPanel(title = 'Violin Plots',
                  plotlyOutput("ViolinPlot", height = "800"))
       )
@@ -288,7 +294,7 @@ server <- function(input, output, session) {
         ## Plot
         feat_plt <- plotly::plot_ly(x = metadata_df[, "coord_x"],
                                     y = metadata_df[, "coord_y"],
-                                    color = expr_mtrx[gene, ],
+                                    color = expr_mtrx[gene, metadata_df$barcode],
                                     colors = "Blues",
                                     marker = list(size = as.numeric(input$size)),
                                     # Hover text:
@@ -372,7 +378,7 @@ server <- function(input, output, session) {
           indent = 1, # let's add extra space from the margins
           exdent = 1  # let's add extra space from the margins
         ),
-        y = expr_mtrx[gene, ],
+        y = expr_mtrx[gene, metadata_df$barcode],
         color = metadata_df[, groupby_var()],
         type = "violin",
         text = labs_ls,
@@ -407,9 +413,16 @@ server <- function(input, output, session) {
                                 shareY = FALSE,
                                 margin = 0.075)
     
-    
     return(vln_arr)
   })
+  
+  
+  ## Gene marker table
+  output$MarkerGenes <- DT::renderDataTable({
+    mtcars},
+    options = list(lengthMenu = c(5, 30, 50),
+                   pageLength = 10),
+    selection = "multiple")
   
 }
 
