@@ -26,15 +26,10 @@ ui <- fluidPage(
     #########################
     sidebarPanel(width = 3,
       # Load Metadata
-      fileInput(inputId = "metadata",
-                label = "Metadata + 2D embedings (coord_x, coord_y)",
+      fileInput(inputId = "seurat",
+                label = "Seurat object",
                 multiple = FALSE),
-      
-      # Load Expression data
-      fileInput(inputId = "data",
-                label = "Expression matrix",
-                multiple = FALSE),
-      
+
       # Select genes to use as markers
       selectizeInput("gene_ls", "Select marker genes:",
                      selected = NULL,
@@ -140,16 +135,11 @@ server <- function(input, output, session) {
     
     # Load data
     # Read marker list
-    file1 <- input$metadata
+    file1 <- input$seurat
     if (is.null(file1) ) { return() }
     tmp1_ds <- readRDS(file1$datapath)
-    metadata_df <<- tmp1_ds
+    se_obj <<- tmp1_ds
 
-    file2 <- input$data
-    if( is.null( file2 ) ) { return() }
-    tmp2_ds <- readRDS(file2$datapath)
-    expr_mtrx <<- tmp2_ds
-    
     # Update Cluster labels
     # updateTextInput(session,
     #                 "labels_vec",
@@ -158,29 +148,29 @@ server <- function(input, output, session) {
     # Update marker selection
     updateSelectizeInput(session,
                          inputId = "gene_ls",
-                         choices = c("", rownames(expr_mtrx)),
-                         selected = rownames(expr_mtrx)[1])
+                         choices = c("", rownames(se_obj)),
+                         selected = rownames(se_obj)[1])
     
     # Update groupby selection
     updateSelectizeInput(session,
                          inputId = "groupby",
                          choices = c("", 
-                                     colnames(metadata_df)),
-                         selected = colnames(metadata_df)[1])
+                                     colnames(se_obj@meta.data)),
+                         selected = colnames(se_obj@meta.data)[1])
     
     # Update interactive_labels selection
     updateSelectizeInput(session,
                          inputId = "interactive_labels",
                          choices = c("", 
-                                     colnames(metadata_df)),
-                         selected = colnames(metadata_df)[1])
+                                     colnames(se_obj@meta.data)),
+                         selected = colnames(se_obj@meta.data)[1])
     
     # Update Filtering variable selection
     updateSelectizeInput(session,
                          inputId = "filter_var",
                          choices = c("", 
-                                     colnames(metadata_df)),
-                         selected = colnames(metadata_df)[1])
+                                     colnames(se_obj@meta.data)),
+                         selected = colnames(se_obj@meta.data)[1])
     
   })
   
@@ -189,8 +179,8 @@ server <- function(input, output, session) {
     # Update Filtering groups
     updateCheckboxGroupInput(session,
                              inputId = "filter_grp",
-                             choices = unique(metadata_df[, filter_var()]),
-                             selected = unique(metadata_df[, filter_var()]))
+                             choices = unique(se_obj@meta.data[, filter_var()]),
+                             selected = unique(se_obj@meta.data[, filter_var()]))
   })
   
   
@@ -218,7 +208,7 @@ server <- function(input, output, session) {
   })
   
   dfInput <- reactive({
-    ##subsetting is a bit tricky here to id the column on which to subset        
+    ##subsetting is a bit tricky here to id the column on which to subset
     metadata_df[metadata_df[, filter_var()] %in% apply_grp(), ]
   })
 
