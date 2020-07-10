@@ -217,6 +217,12 @@ server <- function(input, output, session) {
     ##subsetting is a bit tricky here to id the column on which to subset        
     metadata_df[metadata_df[, filter_var()] %in% apply_grp(), ]
   })
+  
+  exprInput <- reactive({
+    ##subsetting is a bit tricky here to id the column on which to subset
+    keep_id <- metadata_df[metadata_df[, filter_var()] %in% apply_grp(), "barcode"]
+    expr_mtrx[, keep_id]
+  })
 
   
   ########################################
@@ -249,8 +255,10 @@ server <- function(input, output, session) {
   # Feature plot
   output$FeaturePlot <- renderPlotly({
     
+    # Read data from reactive observed slots
     metadata_df <- dfInput()
-    
+    expr_mtrx <- exprInput()
+
     # tmp_feat <- FeaturePlot(se_obj, features = gene_list())
     labs_feat <- lapply(input$interactive_labels, function(i){
       paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
@@ -318,7 +326,9 @@ server <- function(input, output, session) {
   # Violin plots
   output$ViolinPlot <- renderPlotly({
     
+    # Read data from reactive observed slots
     metadata_df <- dfInput()
+    expr_mtrx <- exprInput()
     
     labs_ls <- lapply(input$interactive_labels, function(i){
       paste(sprintf("%s: ", i), metadata_df[, i], sep = "")
