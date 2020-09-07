@@ -6,6 +6,8 @@ library(Seurat)
 library(ggplot2)
 library(plotly)
 library(RColorBrewer)
+library(profvis)
+
 # library(ggpubr)
 
 # Metadata dataframe set as NULL at the beginning to avoid showing error
@@ -25,6 +27,19 @@ ui <- fluidPage(
     #### Parameter entry ####
     #########################
     sidebarPanel(width = 3,
+     # CSS formatting for description text
+     tags$head(tags$style("#text1{color: black;
+                 font-size: 40px;
+             font-style: bold;
+             }"
+     )
+     ),
+     tags$head(tags$style("#text2{color: #5e5e5e;
+                 font-size: 20px;
+             font-style: italic;
+             }"
+     )
+     ),
       # Load Metadata
       fileInput(inputId = "metadata",
                 label = "Metadata + 2D embedings (coord_x, coord_y)",
@@ -50,7 +65,7 @@ ui <- fluidPage(
                      options = list(create = TRUE),
                      # multiple = TRUE,
                      multiple = FALSE),
-      actionButton(inputId = "apply_groupby", label = "Update coloring"),
+      actionButton(inputId = "apply_groupby", label = "Update Grouping"),
       
       # Which labels to add to interactive output
       selectizeInput("interactive_labels", "Interactive labels:",
@@ -89,11 +104,16 @@ ui <- fluidPage(
     ############################
     mainPanel(
       tabsetPanel(
-        tabPanel(title = 'UMAP Plot',
+        tabPanel(title = "Description",
+                 textOutput("text1"),
+                 textOutput("text2"),
+                 htmlOutput("text3"),
+                 htmlOutput("text4")),
+        tabPanel(title = "UMAP Plot",
                  plotlyOutput("dimPlot", height = "800")),
-        tabPanel(title = 'Feature Plots',
+        tabPanel(title = "Feature Plots",
                  plotlyOutput("FeaturePlot", height = "800")),
-        tabPanel(title = 'Violin Plots',
+        tabPanel(title = "Violin Plots",
                  plotlyOutput("ViolinPlot", height = "800"))
       )
     )
@@ -107,8 +127,8 @@ ui <- fluidPage(
 ##################################################################################################################
 
 server <- function(input, output, session) {
-  # Setting maximum file size to 4GB
-  options(shiny.maxRequestSize=8000*1024^2)
+  # Setting maximum file size to 8GB
+  options(shiny.maxRequestSize = 8000 * 1024 ^ 2)
   
   observeEvent(input$apply_checkbox, {
     shinyjs::toggle("interactive_filter")
@@ -222,7 +242,36 @@ server <- function(input, output, session) {
     metadata_df[metadata_df[, filter_var()] %in% apply_grp(), ]
   })
 
-
+  exprInput <- reactive({
+    ##subsetting is a bit tricky here to id the column on which to subset
+    keep_id <- metadata_df[metadata_df[, filter_var()] %in% apply_grp(), "barcode"]
+    expr_mtrx[, keep_id]
+  })
+  ###########################################
+  ######### 1st tab App description #########
+  ###########################################
+  output$text1 <- renderText({
+    "Introduction"
+  })
+  
+  output$text2 <- renderText({
+    "Please read this carefully before using the app. Here we explain the purpose of the app as well as the file format requirements."
+  })
+  
+  output$text3 <- renderUI({
+    HTML("<p>This App is designed to take in 2 RDS files, one containing the metadata of the cells and the second containing the gene expression matrix of choice.<br/>
+    These RDS objects can be obtained using the function found <a href='https://github.com/MarcElosua/Shiny_annotation/blob/master/seurat_preprocess_fun.R'> <B>here</B></a>!<br/>
+    <B>Before visualizing the plots</B> for the 1st time one must click the update buttons selecting <i>genes of interest</i>, <i>grouping variable</i>, <i>filtering variable</i> and <i>filtering selection</i></p>")
+  })
+  
+  output$text4 <- renderUI({
+    HTML("&#8226;<B>Metadata file</B>: this file contains as many rows as cells are in the dataset with information regarding each one.
+    Please check that it contains the variables:<br/>
+    &nbsp;&#8212;<B>coord_x, coord_y</B>: containing the 2D embedding of the cells<br/>
+    &nbsp;&#8212;<B>barcode</B>: containing the cell barcode matching the colnames of the expression matrix<br/>
+    &#8226;<B>Expression matrix</B>: this file is a GENExCELL expression matrix with gene names as rownames and cell barcodes as colnames.")
+  })
+  
   ########################################
   ######### Plot visualization ###########
   ########################################
@@ -253,8 +302,10 @@ server <- function(input, output, session) {
   # Feature plot
   output$FeaturePlot <- renderPlotly({
     
+    # Read data from reactive observed slots
     metadata_df <- dfInput()
-    
+    expr_mtrx <- exprInput()
+
     # tmp_feat <- FeaturePlot(se_obj, features = gene_list())
     labs_feat <- lapply(input$interactive_labels, function(i){
       paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
@@ -322,7 +373,9 @@ server <- function(input, output, session) {
   # Violin plots
   output$ViolinPlot <- renderPlotly({
     
+    # Read data from reactive observed slots
     metadata_df <- dfInput()
+    expr_mtrx <- exprInput()
     
     labs_ls <- lapply(input$interactive_labels, function(i){
       paste(sprintf("\n%s: ", i), metadata_df[, i], sep = "")
@@ -415,6 +468,5 @@ server <- function(input, output, session) {
 
 shinyApp(ui, server)
 
-# # Code profiling
-# library(profvis)
+# Code profiling
 # profvis(runApp())
