@@ -69,17 +69,17 @@ ui <- fluidPage(
       actionButton(inputId = "apply_groupby", label = "Update Grouping"),
       
       # Which labels to add to interactive output
-      selectizeInput("interactive_labels", "Interactive labels:",
-                     selected = NULL,
-                     choices = NULL,
-                     options = list(create = TRUE),
-                     multiple = TRUE),
+      # selectizeInput("interactive_labels", "Interactive labels:",
+      #                selected = NULL,
+      #                choices = NULL,
+      #                options = list(create = TRUE),
+      #                multiple = TRUE),
       
       # Slider to determine point size of UMAP plots
       sliderInput("size", "Dot size:",
                   min = 0,
                   max = 10,
-                  value = 4,
+                  value = 3,
                   step = 0.1),
       
       # Which labels to add to interactive output
@@ -111,11 +111,11 @@ ui <- fluidPage(
                  htmlOutput("text3"),
                  htmlOutput("text4")),
         tabPanel(title = "UMAP Plot",
-                 plotlyOutput("dimPlot", height = "800")),
+                 plotOutput("dimPlot", height = "800")),
         tabPanel(title = "Feature Plots",
-                 plotlyOutput("FeaturePlot", height = "800")),
+                 plotOutput("FeaturePlot", height = "800")),
         tabPanel(title = "Violin Plots",
-                 plotlyOutput("ViolinPlot", height = "800"))
+                 plotOutput("ViolinPlot", height = "800"))
       )
     )
   )
@@ -147,18 +147,6 @@ server <- function(input, output, session) {
   ##############################
   observe({
     
-    nrow_dictionary <<- list()
-    nrow_dictionary[[1]] <<- 1
-    nrow_dictionary[[2]] <<- 1
-    nrow_dictionary[[3]] <<- 2
-    nrow_dictionary[[4]] <<- 2
-    nrow_dictionary[[5]] <<- 2
-    nrow_dictionary[[6]] <<- 2
-    nrow_dictionary[[7]] <<- 3
-    nrow_dictionary[[8]] <<- 3
-    nrow_dictionary[[9]] <<- 3
-    nrow_dictionary[[10]] <<- 4
-    
     # Load data
     # Read marker list
     file1 <- input$metadata
@@ -182,7 +170,7 @@ server <- function(input, output, session) {
                          choices = c("", rownames(expr_mtrx)),
                          selected = rownames(expr_mtrx)[1])
     
-    feat_ind <- sapply(metadata_df, function(x) length(unique(x)) <= 25)
+    feat_ind <- sapply(metadata_df, function(x) length(unique(x)) <= 50)
     feat_sub <- colnames(metadata_df)[feat_ind]
     
     # Update groupby selection
@@ -193,11 +181,11 @@ server <- function(input, output, session) {
                          selected = feat_sub[1])
     
     # Update interactive_labels selection
-    updateSelectizeInput(session,
-                         inputId = "interactive_labels",
-                         choices = c("", 
-                                     feat_sub),
-                         selected = feat_sub[1])
+    # updateSelectizeInput(session,
+    #                      inputId = "interactive_labels",
+    #                      choices = c("", 
+    #                                  feat_sub),
+    #                      selected = feat_sub[1])
     
     # Update Filtering variable selection
     updateSelectizeInput(session,
@@ -229,9 +217,9 @@ server <- function(input, output, session) {
     input$groupby
   })
   
-  interactive_labels <- eventReactive(input$apply_labs, {
-    input$interactive_labels
-  })
+  # interactive_labels <- eventReactive(input$apply_labs, {
+  #   input$interactive_labels
+  # })
   
   filter_var <- eventReactive(input$apply_filter, {
     input$filter_var
@@ -281,21 +269,42 @@ server <- function(input, output, session) {
   ########################################
   
   # UMAP clusters
-  output$dimPlot <- renderPlotly({
+  output$dimPlot <- renderPlot({
 
     metadata_df <- dfInput()
-    # Set interactive labels
-    labs_dim <- lapply(input$interactive_labels, function(i){
-      paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
-    }) %>% purrr::pmap_chr(., paste)
+    # # Set interactive labels
+    # labs_dim <- lapply(input$interactive_labels, function(i){
+    #   paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
+    # }) %>% purrr::pmap_chr(., paste)
     
-    dim_plot <- plot_ly(x = metadata_df[, "coord_x"],
-                        y = metadata_df[, "coord_y"],
-                        color = metadata_df[, groupby_var()],
-                        # Hover text:
-                        text = labs_dim,
-                        marker = list(size = as.numeric(input$size))
-    )
+    # Define the number of colors you want
+    nb.cols <- length(unique(metadata_df[, groupby_var()]))
+    set2_expand <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set2"))(nb.cols)
+    
+    dim_plot <- ggplot2::ggplot(data.frame(x = metadata_df[, "coord_x"],
+                                           y = metadata_df[, "coord_y"])) +
+      scattermore::geom_scattermore(aes(x,
+                                        y,
+                                        color = metadata_df[, groupby_var()]),
+                                    pointsize = as.numeric(input$size),
+                                    alpha = 0.7,
+                                    pixels = c(2000, 2000),
+                                    interpolate = TRUE) +
+      ggplot2::scale_color_manual(values = set2_expand) +
+      ggplot2::theme_classic() +
+      ggplot2::labs(
+        title = "",
+        x = "DIM-1",
+        y = "DIM-2",
+        color = groupby_var())
+    
+    # dim_plot <- plot_ly(x = metadata_df[, "coord_x"],
+    #                     y = metadata_df[, "coord_y"],
+    #                     color = metadata_df[, groupby_var()],
+    #                     # Hover text:
+    #                     text = labs_dim,
+    #                     marker = list(size = as.numeric(input$size))
+    # )
     
     return(dim_plot)
   })
@@ -304,166 +313,180 @@ server <- function(input, output, session) {
   # Feature plot and Violin plot are dependent on apply_markers button to be pressed
   
   # Feature plot
-  output$FeaturePlot <- renderPlotly({
+  output$FeaturePlot <- renderPlot({
     
     # Read data from reactive observed slots
     metadata_df <- dfInput()
     expr_mtrx <- exprInput()
 
     # tmp_feat <- FeaturePlot(se_obj, features = gene_list())
-    labs_feat <- lapply(input$interactive_labels, function(i){
-      paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
-    }) %>% purrr::pmap_chr(., paste)
+    # labs_feat <- lapply(input$interactive_labels, function(i){
+    #   paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
+    # }) %>% purrr::pmap_chr(., paste)
     
     ## Plot all genes
     plt_ls <- lapply(gene_list(), function(gene) {
-      
       if (gene %in% rownames(expr_mtrx)) {
-        ## Title
-        # font style
-        f <- list(
-          family = "Courier New, monospace",
-          size = 18,
-          color = "black")
-        
-        titl <- list(
-          text = sprintf("Gene: %s", gene),
-          font = f,
-          xref = "paper",
-          yref = "paper",
-          yanchor = "bottom",
-          xanchor = "center",
-          align = "center",
-          x = 0.5,
-          y = 1,
-          showarrow = FALSE,
-          face = "bold"
-        )
-        
         ## Plot
-        feat_plt <- plotly::plot_ly(x = metadata_df[, "coord_x"],
-                                    y = metadata_df[, "coord_y"],
-                                    color = expr_mtrx[gene, ],
-                                    colors = "Blues",
-                                    marker = list(size = as.numeric(input$size)),
-                                    # Hover text:
-                                    text = labs_feat) %>%
-          plotly::layout(annotations = titl,
-                         showlegend = FALSE)
+        feat_plt <- ggplot2::ggplot(data.frame(x = metadata_df[, "coord_x"],
+                                               y = metadata_df[, "coord_y"])) +
+          scattermore::geom_scattermore(aes(x,
+                                            y,
+                                            color = expr_mtrx[gene, ]),
+                                        pointsize = 1,
+                                        alpha = 0.7,
+                                        pixels = c(1000,1000),
+                                        interpolate = TRUE) +
+          ggplot2::scale_color_gradient(low = "lightgrey",
+                                        high = "blue") +
+          ggplot2::theme_classic() +
+          ggplot2::labs(
+            title = gene,
+            x = "DIM-1",
+            y = "DIM-2",
+            color = "Expression") +
+          ggplot2::theme(
+            plot.title = element_text(hjust = 0.5, face = "bold")
+          )
+        
       } else {
         warning(sprintf("Gene %s not found in the expression matrix.", gene))
         return(NULL)
       }
-      
     })
-    
-    # Set the number of rows
-    if (length(gene_list()) > length(nrow_dictionary)) {
-      n_row <- 4
-    } else {
-      n_row <- nrow_dictionary[[length(gene_list())]]
-    }
-    
+
     # Arrange all the plots
-    feat_arr <- plotly::subplot(plt_ls,
-                                nrows = n_row,
-                                shareX = FALSE,
-                                shareY = FALSE,
-                                margin = 0.05)
+    feat_arr <- cowplot::plot_grid(plotlist = plt_ls,
+                                   align = "hv",
+                                   axis = "tbrl")
     
     return(feat_arr)
   })
   
   # Violin plots
-  output$ViolinPlot <- renderPlotly({
+  output$ViolinPlot <- renderPlot({
     
     # Read data from reactive observed slots
     metadata_df <- dfInput()
     expr_mtrx <- exprInput()
     
-    labs_ls <- lapply(input$interactive_labels, function(i){
-      paste(sprintf("\n%s: ", i), metadata_df[, i], sep = "")
-    }) %>% purrr::pmap_chr(., paste)
+    nb.cols <- length(unique(metadata_df[, groupby_var()]))
+    set2_expand <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set2"))(nb.cols)
+    
+    # labs_ls <- lapply(input$interactive_labels, function(i){
+    #   paste(sprintf("\n%s: ", i), metadata_df[, i], sep = "")
+    # }) %>% purrr::pmap_chr(., paste)
     
     ## Plot all genes
     vln_ls <- lapply(gene_list(), function(gene) {
-      ## Title
-      # font style
-      f <- list(
-        family = "Courier New, monospace",
-        size = 18,
-        color = "black")
-      
-      titl <- list(
-        text = sprintf("Gene: %s", gene),
-        font = f,
-        xref = "paper",
-        yref = "paper",
-        yanchor = "bottom",
-        xanchor = "center",
-        align = "center",
-        x = 0.5,
-        y = 1,
-        showarrow = FALSE,
-        face = "bold")
-      
-      ## X axis text
-      f1 <- list(
-        family = "Courier New, monospace",
-        size = 10,
-        color = "black"
-      )
-      
-      a <- list(
-        title = groupby_var(),
-        tickfont = f1,
-        showticklabels = TRUE,
-        tickangle = 90
-      )
+      # ## Title
+      # # font style
+      # f <- list(
+      #   family = "Courier New, monospace",
+      #   size = 18,
+      #   color = "black")
+      # 
+      # titl <- list(
+      #   text = sprintf("Gene: %s", gene),
+      #   font = f,
+      #   xref = "paper",
+      #   yref = "paper",
+      #   yanchor = "bottom",
+      #   xanchor = "center",
+      #   align = "center",
+      #   x = 0.5,
+      #   y = 1,
+      #   showarrow = FALSE,
+      #   face = "bold")
+      # 
+      # ## X axis text
+      # f1 <- list(
+      #   family = "Courier New, monospace",
+      #   size = 10,
+      #   color = "black"
+      # )
+      # 
+      # a <- list(
+      #   title = groupby_var(),
+      #   tickfont = f1,
+      #   showticklabels = TRUE,
+      #   tickangle = 90
+      # )
       
       ## Plots
-      vln_plt <- plotly::plot_ly(
-        x = stringr::str_wrap(
-          string = metadata_df[, groupby_var()],
-          width = 15,
-          indent = 1, # let's add extra space from the margins
-          exdent = 1  # let's add extra space from the margins
-        ),
-        y = expr_mtrx[gene, ],
-        color = metadata_df[, groupby_var()],
-        type = "violin",
-        text = labs_ls,
-        points = "all",
-        jitter = 1,
-        pointpos = 0,
-        box = list(
-          visible = FALSE
-        ),
-        meanline = list(
-          visible = TRUE
+      # vln_plt <- plotly::plot_ly(
+      #   x = stringr::str_wrap(
+      #     string = metadata_df[, groupby_var()],
+      #     width = 15,
+      #     indent = 1, # let's add extra space from the margins
+      #     exdent = 1  # let's add extra space from the margins
+      #   ),
+      #   y = expr_mtrx[gene, ],
+      #   color = metadata_df[, groupby_var()],
+      #   type = "violin",
+      #   text = labs_ls,
+      #   points = "all",
+      #   jitter = 1,
+      #   pointpos = 0,
+      #   box = list(
+      #     visible = FALSE
+      #   ),
+      #   meanline = list(
+      #     visible = TRUE
+      #   )
+      # ) %>%
+      #   plotly::layout(annotations = titl,
+      #                  xaxis = a,
+      #                  showlegend = FALSE)
+      vln_plt <- ggplot2::ggplot(data.frame(x = metadata_df[, groupby_var()],
+                                            y = expr_mtrx[gene, ])) +
+        ggplot2::geom_violin(aes(x = metadata_df[, groupby_var()],
+                                 y = expr_mtrx[gene, ],
+                                 color = metadata_df[, groupby_var()],
+                                 fill = metadata_df[, groupby_var()]),
+                             alpha = 0.6) +
+        # scattermore::geom_scattermore(aes(x,
+        #                                   y,
+        #                                   color = metadata_df[, groupby_var()]),
+        #                               pointsize = 1,
+        #                               alpha = 0.7,
+        #                               pixels = c(2000, 2000),
+        #                               interpolate = TRUE) +
+        ggplot2::scale_color_manual(values = set2_expand) +
+        ggplot2::scale_fill_manual(values = set2_expand) +
+        ggplot2::theme_classic() +
+        ggplot2::labs(
+          title = gene,
+          x = groupby_var(),
+          y = sprintf("%s expression", gene),
+          color = groupby_var(),
+          fill  = groupby_var()) +
+        ggplot2::theme(
+          plot.title = ggplot2::element_text(hjust = 0.5,
+                                    face = "bold")
         )
-      ) %>%
-        plotly::layout(annotations = titl,
-                       xaxis = a,
-                       showlegend = FALSE)
       
       return(vln_plt)
       })
     
     # Set the number of rows
-    if (length(gene_list()) > length(nrow_dictionary)) {
-      n_row <- 4
-    } else {
-      n_row <- nrow_dictionary[[length(gene_list())]]
-    }
+    # if (length(gene_list()) > length(nrow_dictionary)) {
+    #   n_row <- 4
+    # } else {
+    #   n_row <- nrow_dictionary[[length(gene_list())]]
+    # }
     
     # Arrange all the plots
-    vln_arr <- plotly::subplot(vln_ls,
-                                nrows = n_row,
-                                shareX = FALSE,
-                                shareY = FALSE,
-                                margin = 0.075)
+    vln_arr <- cowplot::plot_grid(plotlist = vln_ls,
+                                   align = "hv",
+                                   axis = "tbrl")
     
+    # vln_arr <- plotly::subplot(vln_ls,
+    #                             # nrows = n_row,
+    #                             shareX = FALSE,
+    #                             shareY = FALSE,
+    #                             margin = 0.075)
+    # 
     
     return(vln_arr)
   })
