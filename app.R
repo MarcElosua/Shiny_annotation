@@ -7,6 +7,7 @@ library(ggplot2)
 library(plotly)
 library(RColorBrewer)
 library(profvis)
+library(scattermore)
 
 # library(ggpubr)
 
@@ -181,26 +182,29 @@ server <- function(input, output, session) {
                          choices = c("", rownames(expr_mtrx)),
                          selected = rownames(expr_mtrx)[1])
     
+    feat_ind <- sapply(metadata_df, function(x) length(unique(x)) <= 25)
+    feat_sub <- colnames(metadata_df)[feat_ind]
+    
     # Update groupby selection
     updateSelectizeInput(session,
                          inputId = "groupby",
                          choices = c("", 
-                                     colnames(metadata_df)),
-                         selected = colnames(metadata_df)[1])
+                                     feat_sub),
+                         selected = feat_sub[1])
     
     # Update interactive_labels selection
     updateSelectizeInput(session,
                          inputId = "interactive_labels",
                          choices = c("", 
-                                     colnames(metadata_df)),
-                         selected = colnames(metadata_df)[1])
+                                     feat_sub),
+                         selected = feat_sub[1])
     
     # Update Filtering variable selection
     updateSelectizeInput(session,
                          inputId = "filter_var",
                          choices = c("", 
-                                     colnames(metadata_df)),
-                         selected = colnames(metadata_df)[1])
+                                     feat_sub),
+                         selected = feat_sub[1])
     
   })
   
