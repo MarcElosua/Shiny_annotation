@@ -25,7 +25,7 @@ prepare_se_obj <- function(se_obj,
   if (! slot %in% c("counts", "data", "scale.data")) warning("slot not in the Seurat object's assays.")
   if (! reduction %in% names(se_obj@reductions)) stop("reduction not in the Seurat object's available reductions.")
   
-  # Extract 2D cordinates
+  # Extract 2D coordinates
   embed_df <- se_obj@reductions[[reduction]]@cell.embeddings %>%
     data.frame() %>%
     tibble::rownames_to_column("barcode")
