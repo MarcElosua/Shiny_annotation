@@ -305,6 +305,11 @@ server <- function(input, output, session) {
       set2_expand <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set2"))(nb.cols)
       
       dim_plot <- dim_plot + ggplot2::scale_color_manual(values = set2_expand)
+    } else {
+      # Define coloring for numerical variable
+      dim_plot <- dim_plot + ggplot2::scale_color_gradient(low = "lightgrey",
+                                    high = "blue")
+        
     }
 
     return(dim_plot)
