@@ -170,9 +170,18 @@ server <- function(input, output, session) {
                          choices = c("", rownames(expr_mtrx)),
                          selected = rownames(expr_mtrx)[1])
     
-    feat_ind <- sapply(metadata_df, function(x) length(unique(x)) <= 50)
-    feat_sub <- colnames(metadata_df)[feat_ind]
+    # Subset character/factor columns with <= 50 unique values
+    feat_ch1 <- sapply(metadata_df, function(x) length(unique(x)) <= 50)
+    feat_ch2 <- sapply(colnames(metadata_df), function(x) !is.numeric(metadata_df[, x]))
+    feat_ch <- colnames(metadata_df)[feat_ch1 & feat_ch2]
     
+    # Subset numeric metadata columns
+    feat_num1 <- sapply(colnames(metadata_df), function(x) is.numeric(metadata_df[, x]))
+    feat_num <- colnames(metadata_df)[feat_num1]
+    
+    # Join metadata variables of interset subset
+    feat_sub <- c(feat_ch, feat_num)
+
     # Update groupby selection
     updateSelectizeInput(session,
                          inputId = "groupby",
@@ -191,8 +200,8 @@ server <- function(input, output, session) {
     updateSelectizeInput(session,
                          inputId = "filter_var",
                          choices = c("", 
-                                     feat_sub),
-                         selected = feat_sub[1])
+                                     feat_ch),
+                         selected = feat_ch[1])
     
   })
   
@@ -272,15 +281,7 @@ server <- function(input, output, session) {
   output$dimPlot <- renderPlot({
 
     metadata_df <- dfInput()
-    # # Set interactive labels
-    # labs_dim <- lapply(input$interactive_labels, function(i){
-    #   paste(sprintf('\n%s: ',i), metadata_df[,i], sep = '')
-    # }) %>% purrr::pmap_chr(., paste)
-    
-    # Define the number of colors you want
-    nb.cols <- length(unique(metadata_df[, groupby_var()]))
-    set2_expand <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set2"))(nb.cols)
-    
+
     dim_plot <- ggplot2::ggplot(data.frame(x = metadata_df[, "coord_x"],
                                            y = metadata_df[, "coord_y"])) +
       scattermore::geom_scattermore(aes(x,
@@ -290,7 +291,6 @@ server <- function(input, output, session) {
                                     alpha = 0.7,
                                     pixels = c(2000, 2000),
                                     interpolate = TRUE) +
-      ggplot2::scale_color_manual(values = set2_expand) +
       ggplot2::theme_classic() +
       ggplot2::labs(
         title = "",
@@ -298,14 +298,15 @@ server <- function(input, output, session) {
         y = "DIM-2",
         color = groupby_var())
     
-    # dim_plot <- plot_ly(x = metadata_df[, "coord_x"],
-    #                     y = metadata_df[, "coord_y"],
-    #                     color = metadata_df[, groupby_var()],
-    #                     # Hover text:
-    #                     text = labs_dim,
-    #                     marker = list(size = as.numeric(input$size))
-    # )
-    
+    # Define plot color differences when character coloring variable passed
+    if (! is.numeric(metadata_df[, groupby_var()])) {
+      # Define the number of colors you want
+      nb.cols <- length(unique(metadata_df[, groupby_var()]))
+      set2_expand <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set2"))(nb.cols)
+      
+      dim_plot <- dim_plot + ggplot2::scale_color_manual(values = set2_expand)
+    }
+
     return(dim_plot)
   })
 
@@ -333,7 +334,7 @@ server <- function(input, output, session) {
           scattermore::geom_scattermore(aes(x,
                                             y,
                                             color = expr_mtrx[gene, ]),
-                                        pointsize = 1,
+                                        pointsize = as.numeric(input$size),
                                         alpha = 0.7,
                                         pixels = c(1000,1000),
                                         interpolate = TRUE) +
