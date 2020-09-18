@@ -157,7 +157,7 @@ server <- function(input, output, session) {
     file2 <- input$data
     if( is.null( file2 ) ) { return() }
     tmp2_ds <- readRDS(file2$datapath)
-    expr_mtrx <<- tmp2_ds
+    expr_mtrx <<- as.matrix(tmp2_ds)
     
     # Update Cluster labels
     # updateTextInput(session,
@@ -451,13 +451,6 @@ server <- function(input, output, session) {
                                  color = metadata_df[, groupby_var()],
                                  fill = metadata_df[, groupby_var()]),
                              alpha = 0.6) +
-        # scattermore::geom_scattermore(aes(x,
-        #                                   y,
-        #                                   color = metadata_df[, groupby_var()]),
-        #                               pointsize = 1,
-        #                               alpha = 0.7,
-        #                               pixels = c(2000, 2000),
-        #                               interpolate = TRUE) +
         ggplot2::scale_color_manual(values = set2_expand) +
         ggplot2::scale_fill_manual(values = set2_expand) +
         ggplot2::theme_classic() +
