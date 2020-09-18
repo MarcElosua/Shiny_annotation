@@ -1,49 +1,80 @@
-#' This function takes in a seurat object and returns a named list with 2 objects, 1st the metadata + the coordinates of the 2D embeding, the later with names coord_x and coord_y, and second the expression matrix selected.
+#' This function takes in a Seurat 3.0 object and returns a named list with 2
+#' objects formated to be loaded in the ShinyApp:
 #'
-#' @param se_obj Object of class Seurat from which we want to extract the information.
-#' @param assay Object of class Character indicating from which assay to extract expression data.
-#' @param slot Object of class Character indicating from which slot to extract expression data, by default data.
-#' @param reduction Object of class Character indicating from which dimensionality reduction we want to extract the coordinates.
-#' @return This function returns a named list, the first position contains the joint metadata + 2D embeding and the second contains the expression data matrix. 2D dimensions are labelles as coord_x and coord_y.
-#' @export
+#'      1. Metadata + coordinates of the 2D embeding.
+#'      2. Expression matrix of the selected slot.
+#'
+#' ShinyApp: https://singlecellgenomics-cnag-crg.shinyapps.io/Annotation
+#'
+#' @param object Object of class Seurat. Mandatory.
+#' @param assay Character string. Assay within the Seurat object from which to extract the expression matrix. Default: active assay.
+#' @param reduction Character string. Dimensionality reduction from which to extract the 2D coordinates. Default: umap.
+#' @param slot Character string. Slot containing the expression matrix. Default: data.
+#' @param asfactors Character vector. Metadata columns to be converted to factors. Default: NULL.
+#' @param save Logical value. Save metadata and expression matrix objects as RDS files. Default: TRUE.
+#' @param path Character string. Path to save output files if 'save = TRUE'. Default: working directory.
+#'
+#' @return Named list containing the joint metadata + 2D embeding and the expression matrix.
+#'
 #' @examples
+#' seurat2shiny( object = seurat_object, asfactors = c("plate", "replicate") )
 #'
+#' shiny_list = seurat2shiny(object = seurat_object)
+#'
+#' @export
 
-prepare_se_obj <- function(se_obj,
-                           assay,
-                           slot = "data",
-                           reduction = "umap") {
-  
-  suppressMessages(library(dplyr))
-  suppressMessages(library(Seurat))
-  suppressMessages(library(tibble))
-  suppressMessages(library(SummarizedExperiment))
-  
-  # Input check
-  if (! is(se_obj, "Seurat")) stop("Object passed is not a Seurat object;")
-  if (! assay %in% Seurat::Assays(se_obj)) stop("assay not in the Seurat object's available assays.")
-  if (! slot %in% c("counts", "data", "scale.data")) warning("slot not in the Seurat object's assays.")
-  if (! reduction %in% names(se_obj@reductions)) stop("reduction not in the Seurat object's available reductions.")
-  
-  # Extract 2D cordinates
-  embed_df <- se_obj@reductions[[reduction]]@cell.embeddings %>%
-    data.frame() %>%
-    tibble::rownames_to_column("barcode")
-  
-  # Change 2D coordinate names to coord_x and coord_y
-  colnames(embed_df) <- c("barcode", "coord_x", "coord_y")
-  
-  # Join metadata with coordinates
-  metadata_df <- se_obj@meta.data %>%
-    data.frame() %>%
-    tibble::rownames_to_column("barcode") %>%
-    dplyr::left_join(embed_df, by = "barcode")
-  
-  # Extract expression data
-  assay_data <- Seurat::GetAssayData(se_obj,
-                                     slot = slot,
-                                     assay = assay)
-  
-  return(list(metadata = metadata_df,
-              expr_data = assay_data))
-  }
+
+seurat2shiny = function(
+    object                         ,
+    assay     = object@active.assay,
+    reduction = "umap"             ,
+    slot      = "data"             ,
+    asfactors = NULL               ,
+    save      = TRUE               ,
+    path      = "."                  # path = getwd()
+) {
+    suppressMessages( library(Seurat) );
+
+    # Input check.
+    if ( ! is(object, "Seurat") )
+        stop("'object' is not a Seurat object.");
+
+    if ( ! assay %in% Seurat::Assays(object) )
+        stop("'assay' not in the Seurat object's available assays.");
+
+    if ( ! reduction %in% names(object@reductions) )
+        stop("'reduction' not in the Seurat object's available reductions.");
+
+    if ( ! slot %in% c("counts", "data", "scale.data") )
+        stop("'slot' not in the Seurat object's available slots.");
+
+    # Extract 2D coordinates.
+    embeds = as.data.frame(object@reductions[[reduction]]@cell.embeddings);
+    names(embeds) = c("coord_x", "coord_y");
+
+    # Join metadata with coordinates.
+    metadata = object@meta.data;
+
+    for (col in asfactors) {
+        metadata[[col]] = as.factor(metadata[[col]]);
+    };
+
+    metadata = merge(x = metadata, y = embeds, by = "row.names");
+    names(metadata)[1] = "barcode"; # names(metadata)[names(metadata) == "Row.names"] = "barcode";
+
+    # Extract expression data.
+    # expression = as.matrix( Seurat::GetAssayData(object = object, slot = slot, assay = assay) );
+    expression = Seurat::GetAssayData(object = object, slot = slot, assay = assay);
+
+    if ( ! identical( as.character(metadata$barcode), colnames(expression) ) )
+        warning("Cells in metadata and expression matrix do not match.");
+
+    if (save) {
+        saveRDS( object = metadata  , file = paste0(path, "/metadata.rds"  ) );
+        saveRDS( object = expression, file = paste0(path, "/expression.rds") );
+    };
+
+    invisible(
+        list(metadata = metadata, expression = expression)
+    );
+};
